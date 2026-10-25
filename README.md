@@ -9,6 +9,8 @@ A fast, lightweight Pokemon sprite viewer for your terminal written in [Goose](h
 
 A port of [zigdex](https://github.com/Decryptu/zigdex) to compare the two languages on the same program: same assets, same sprite format, byte-for-byte the same output.
 
+<img src="assets/screenshot.webp" alt="goosedex rayquaza" width="600">
+
 </div>
 
 ## Features
