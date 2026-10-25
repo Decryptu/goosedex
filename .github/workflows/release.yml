@@ -29,9 +29,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release download "$GOOSE_VERSION" -R aardappel/goose -p "goose-$GOOSE_VERSION-macos-arm64.tar.gz" -O goose.tar.gz
-          mkdir goose-dist && tar -xzf goose.tar.gz -C goose-dist
-          dirname "$(find "$PWD/goose-dist" -name goose -type f -perm +111 | head -1)" >> "$GITHUB_PATH"
+          # Outside the workspace, where the release's asset globs would pick it up.
+          gh release download "$GOOSE_VERSION" -R aardappel/goose -p "goose-$GOOSE_VERSION-macos-arm64.tar.gz" -O "$RUNNER_TEMP/goose.tar.gz"
+          mkdir "$RUNNER_TEMP/goose" && tar -xzf "$RUNNER_TEMP/goose.tar.gz" -C "$RUNNER_TEMP/goose"
+          dirname "$(find "$RUNNER_TEMP/goose" -name goose -type f -perm +111 | head -1)" >> "$GITHUB_PATH"
 
       - run: make test
 
