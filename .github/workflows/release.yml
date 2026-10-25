@@ -1,0 +1,64 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Version tag to create on the selected branch, e.g. v0.1.0
+        required: true
+      notes:
+        description: Release notes (Markdown)
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  TAG: ${{ inputs.tag || github.ref_name }}
+  GOOSE_VERSION: v2026.3
+
+jobs:
+  release:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Goose
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "$GOOSE_VERSION" -R aardappel/goose -p "goose-$GOOSE_VERSION-macos-arm64.tar.gz" -O goose.tar.gz
+          mkdir goose-dist && tar -xzf goose.tar.gz -C goose-dist
+          dirname "$(find "$PWD/goose-dist" -name goose -type f -perm +111 | head -1)" >> "$GITHUB_PATH"
+
+      - run: make test
+
+      - name: Build and package
+        run: |
+          # Goose emits portable C, so one runner builds both architectures.
+          make out/goosedex.c
+          for arch in aarch64 x86_64; do
+            mkdir -p "dist/$arch"
+            cc -O2 -arch "${arch/aarch64/arm64}" out/goosedex.c -o "dist/$arch/goosedex" -lm -pthread
+            strip "dist/$arch/goosedex"
+            name=goosedex-$TAG-$arch-macos
+            tar -czf "$name.tar.gz" -C "dist/$arch" goosedex
+            (cd "dist/$arch" && zip -q "$GITHUB_WORKSPACE/$name.zip" goosedex)
+          done
+          shasum -a 256 *.tar.gz *.zip > checksums.txt
+          md5 -r *.tar.gz *.zip > md5sums.txt
+          cat checksums.txt
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NOTES: ${{ inputs.notes }}
+        run: |
+          assets=(*.tar.gz *.zip checksums.txt md5sums.txt)
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
+            gh release create "$TAG" --target "$GITHUB_SHA" --title "Goosedex $TAG" --notes "$NOTES" "${assets[@]}"
+          else
+            gh release create "$TAG" --title "Goosedex $TAG" --notes-from-tag "${assets[@]}"
+          fi
